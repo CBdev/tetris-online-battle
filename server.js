@@ -353,7 +353,8 @@ function update(time = 0) {
   animationId = requestAnimationFrame(update);
 }
 function connect() {
-  ws = new WebSocket('ws://' + location.host);
+  const wsProtocol = location.protocol === 'https:' ? 'wss://' : 'ws://';
+  ws = new WebSocket(wsProtocol + location.host);
   ws.onopen = () => { statusEl.textContent = '상대 접속 대기 중...'; };
   ws.onmessage = (event) => {
     const data = JSON.parse(event.data);
