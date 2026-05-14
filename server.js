@@ -459,7 +459,7 @@ function checkWinner() {
   if (connectedPlayers.length >= 2 && activeAlive.length === 1) {
     finished = true;
     activeAlive[0].stateEl.innerHTML = '<span class="winner">승리</span>';
-    statusEl.textContent = `${activeAlive[0].name} 승리!`;
+    statusEl.textContent = activeAlive[0].name + ' 승리!';
     drawAll();
     cancelAnimationFrame(animationId);
   }
