@@ -32,6 +32,14 @@ function usedPlayers() {
   return [...clients.values()].map(c => c.player);
 }
 
+function playerNames() {
+  const names = {};
+  for (const info of clients.values()) {
+    names[info.player] = info.nickname || (info.player + 'P');
+  }
+  return names;
+}
+
 function getAvailablePlayer() {
   const used = usedPlayers();
   for (let i = 1; i <= MAX_PLAYERS; i++) {
@@ -50,7 +58,8 @@ function broadcast(data) {
 function sendPlayers() {
   broadcast({
     type: 'players',
-    players: [...clients.values()].map(c => c.player)
+    players: [...clients.values()].map(c => c.player),
+    names: playerNames()
   });
 }
 
@@ -63,24 +72,34 @@ wss.on('connection', (ws) => {
     return;
   }
 
-  clients.set(ws, { player });
+  clients.set(ws, { player, nickname: player + 'P' });
   ws.send(JSON.stringify({ type: 'assign', player, maxPlayers: MAX_PLAYERS }));
-  broadcast({ type: 'system', message: `${player}P 접속` });
+  broadcast({ type: 'system', message: player + 'P 접속' });
   sendPlayers();
 
   ws.on('message', (message) => {
     let data;
     try { data = JSON.parse(message); } catch { return; }
 
+    if (data.type === 'join') {
+      const info = clients.get(ws);
+      const nickname = String(data.nickname || '').trim().slice(0, 12) || (player + 'P');
+      if (info) info.nickname = nickname;
+      broadcast({ type: 'system', message: player + 'P ' + nickname + ' 입장' });
+      sendPlayers();
+      return;
+    }
+
     if (['state', 'attack', 'lose', 'restart', 'chat'].includes(data.type)) {
-      broadcast({ ...data, player });
+      const info = clients.get(ws);
+      broadcast({ ...data, player, nickname: info ? info.nickname : player + 'P' });
     }
   });
 
   ws.on('close', () => {
     const info = clients.get(ws);
     clients.delete(ws);
-    if (info) broadcast({ type: 'system', message: `${info.player}P 접속 종료` });
+    if (info) broadcast({ type: 'system', message: info.player + 'P ' + (info.nickname || '') + ' 접속 종료' });
     sendPlayers();
   });
 });
@@ -105,12 +124,46 @@ app.get('/', (req, res) => {
       align-items: flex-start;
       padding: 16px;
     }
+    .join-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(2,6,23,.82);
+      backdrop-filter: blur(6px);
+    }
+    .join-modal.show { display: flex; }
+    .join-modal.hidden { display: none; }
+    .join-box {
+      width: min(360px, calc(100vw - 32px));
+      padding: 24px;
+      border-radius: 22px;
+      background: rgba(15,23,42,.96);
+      border: 1px solid rgba(148,163,184,.22);
+      box-shadow: 0 24px 80px rgba(0,0,0,.5);
+      text-align: center;
+    }
+    .join-box h2 { margin: 0 0 8px; font-size: 24px; }
+    .join-box p { margin: 0 0 16px; color: #cbd5e1; font-size: 14px; }
+    .join-box form { display: flex; flex-direction: column; gap: 10px; }
+    .join-box input {
+      border: 1px solid #475569;
+      background: #020617;
+      color: #f8fafc;
+      border-radius: 12px;
+      padding: 13px;
+      outline: none;
+      font-size: 15px;
+      text-align: center;
+    }
     .game-wrap {
-      width: min(1720px, 100%);
+      width: min(100%, 1600px);
       display: grid;
-      grid-template-columns: 1.7fr repeat(4, 0.75fr) 280px;
-      gap: 16px;
-      padding: 18px;
+      grid-template-columns: minmax(300px, 1.4fr) repeat(4, minmax(120px, .65fr)) minmax(260px, 300px);
+      gap: 12px;
+      padding: 14px;
       border-radius: 24px;
       background: rgba(15, 23, 42, 0.9);
       box-shadow: 0 24px 80px rgba(0,0,0,.45);
@@ -118,10 +171,10 @@ app.get('/', (req, res) => {
     }
     .player-area { display: flex; flex-direction: column; align-items: center; gap: 10px; transition: transform .2s ease, opacity .2s ease; }
     .player-area.is-mine { grid-row: span 2; }
-    .player-area.is-mine canvas[id^="board"] { max-width: 420px; border-color: #38bdf8; }
+    .player-area.is-mine canvas[id^="board"] { max-width: min(420px, 100%); border-color: #38bdf8; }
     .player-area.is-mine .player-title { border-color: #38bdf8; box-shadow: 0 0 0 1px rgba(56,189,248,.35); }
     .player-area.is-opponent { opacity: .9; }
-    .player-area.is-opponent canvas[id^="board"] { max-width: 190px; }
+    .player-area.is-opponent canvas[id^="board"] { max-width: min(180px, 100%); }
     .player-area.is-opponent .preview-card { width: 92px; }
     .player-area.is-opponent .preview-label { font-size: 11px; }
     .player-area.is-opponent .player-title strong { font-size: 16px; }
@@ -147,6 +200,7 @@ app.get('/', (req, res) => {
       width: 100%;
       max-width: 300px;
       height: auto;
+      aspect-ratio: 1 / 2;
     }
     .panel { display: flex; flex-direction: column; gap: 12px; }
     h1 { margin: 0; font-size: 24px; line-height: 1.2; letter-spacing: -0.04em; text-align: center; }
@@ -183,7 +237,7 @@ app.get('/', (req, res) => {
       border-radius: 10px;
       border: 1px solid #334155;
     }
-    .chat-box { height: 170px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 4px; }
+    .chat-box { height: 140px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 4px; }
     .chat-line { font-size: 13px; line-height: 1.4; color: #e2e8f0; word-break: break-word; }
     .chat-line.system { color: #fbbf24; }
     .chat-form { display: flex; gap: 6px; margin-top: 10px; }
@@ -198,18 +252,46 @@ app.get('/', (req, res) => {
       outline: none;
     }
     .chat-form button { width: 58px; padding: 10px; }
-    @media (max-width: 1100px) {
-      .game-wrap { grid-template-columns: 1fr; }
-      .panel { order: -1; }
-      .player-area.is-mine canvas[id^="board"] { max-width: 320px; }
-      .player-area.is-opponent canvas[id^="board"] { max-width: 180px; }
+    @media (max-width: 1350px) {
+      body { padding: 8px; }
+      .game-wrap {
+        grid-template-columns: minmax(280px, 1.25fr) repeat(2, minmax(120px, .55fr)) minmax(250px, 280px);
+        gap: 10px;
+        padding: 10px;
+      }
+      .player-area.is-mine { grid-row: span 2; }
+      .player-area.is-opponent canvas[id^="board"] { max-width: 150px; }
+      .player-area.is-opponent .preview-card { display: none; }
+      .panel { grid-row: span 2; }
+      h1 { font-size: 20px; }
+      .card { padding: 10px; }
+      .controls, .rule { font-size: 12px; line-height: 1.45; }
+      .chat-box { height: 110px; }
+    }
+    @media (max-width: 900px) {
+      .game-wrap { grid-template-columns: 1fr 1fr; }
+      .panel { order: -1; grid-column: 1 / -1; grid-row: auto; }
+      .player-area.is-mine { grid-column: 1 / -1; grid-row: auto; }
+      .player-area.is-mine canvas[id^="board"] { max-width: 300px; }
+      .player-area.is-opponent canvas[id^="board"] { max-width: 135px; }
     }
   </style>
 </head>
 <body>
+  <div class="join-modal" id="joinModal">
+    <div class="join-box">
+      <h2>플레이어 이름 입력</h2>
+      <p>게임에서 표시될 이름을 입력하세요.</p>
+      <form id="joinForm">
+        <input id="nicknameInput" maxlength="12" placeholder="예: 정혁" autocomplete="off" />
+        <button type="submit">입장하기</button>
+      </form>
+    </div>
+  </div>
+
   <main class="game-wrap">
     <section class="player-area" id="area1">
-      <div class="player-title"><strong>1P</strong><span id="p1State">대기중</span></div>
+      <div class="player-title"><strong id="p1Name">1P</strong><span id="p1State">대기중</span></div>
       <canvas id="board1" width="300" height="600"></canvas>
       <div class="preview-card">
         <div class="preview-label">다음 블록</div>
@@ -217,7 +299,7 @@ app.get('/', (req, res) => {
       </div>
     </section>
     <section class="player-area" id="area2">
-      <div class="player-title"><strong>2P</strong><span id="p2State">대기중</span></div>
+      <div class="player-title"><strong id="p2Name">2P</strong><span id="p2State">대기중</span></div>
       <canvas id="board2" width="300" height="600"></canvas>
       <div class="preview-card">
         <div class="preview-label">다음 블록</div>
@@ -225,7 +307,7 @@ app.get('/', (req, res) => {
       </div>
     </section>
     <section class="player-area" id="area3">
-      <div class="player-title"><strong>3P</strong><span id="p3State">대기중</span></div>
+      <div class="player-title"><strong id="p3Name">3P</strong><span id="p3State">대기중</span></div>
       <canvas id="board3" width="300" height="600"></canvas>
       <div class="preview-card">
         <div class="preview-label">다음 블록</div>
@@ -233,7 +315,7 @@ app.get('/', (req, res) => {
       </div>
     </section>
     <section class="player-area" id="area4">
-      <div class="player-title"><strong>4P</strong><span id="p4State">대기중</span></div>
+      <div class="player-title"><strong id="p4Name">4P</strong><span id="p4State">대기중</span></div>
       <canvas id="board4" width="300" height="600"></canvas>
       <div class="preview-card">
         <div class="preview-label">다음 블록</div>
@@ -241,7 +323,7 @@ app.get('/', (req, res) => {
       </div>
     </section>
     <section class="player-area" id="area5">
-      <div class="player-title"><strong>5P</strong><span id="p5State">대기중</span></div>
+      <div class="player-title"><strong id="p5Name">5P</strong><span id="p5State">대기중</span></div>
       <canvas id="board5" width="300" height="600"></canvas>
       <div class="preview-card">
         <div class="preview-label">다음 블록</div>
@@ -256,11 +338,11 @@ app.get('/', (req, res) => {
 
       <div class="card score-list">
         <div class="score-row label"><span></span><span>점수</span><span>줄</span><span>콤보</span></div>
-        <div class="score-row"><strong>1P</strong><span id="p1Score">0</span><span id="p1Lines">0</span><span id="p1Combo">0</span></div>
-        <div class="score-row"><strong>2P</strong><span id="p2Score">0</span><span id="p2Lines">0</span><span id="p2Combo">0</span></div>
-        <div class="score-row"><strong>3P</strong><span id="p3Score">0</span><span id="p3Lines">0</span><span id="p3Combo">0</span></div>
-        <div class="score-row"><strong>4P</strong><span id="p4Score">0</span><span id="p4Lines">0</span><span id="p4Combo">0</span></div>
-        <div class="score-row"><strong>5P</strong><span id="p5Score">0</span><span id="p5Lines">0</span><span id="p5Combo">0</span></div>
+        <div class="score-row"><strong id="s1Name">1P</strong><span id="p1Score">0</span><span id="p1Lines">0</span><span id="p1Combo">0</span></div>
+        <div class="score-row"><strong id="s2Name">2P</strong><span id="p2Score">0</span><span id="p2Lines">0</span><span id="p2Combo">0</span></div>
+        <div class="score-row"><strong id="s3Name">3P</strong><span id="p3Score">0</span><span id="p3Lines">0</span><span id="p3Combo">0</span></div>
+        <div class="score-row"><strong id="s4Name">4P</strong><span id="p4Score">0</span><span id="p4Lines">0</span><span id="p4Combo">0</span></div>
+        <div class="score-row"><strong id="s5Name">5P</strong><span id="p5Score">0</span><span id="p5Lines">0</span><span id="p5Combo">0</span></div>
       </div>
 
       <div class="card controls">
@@ -297,6 +379,9 @@ const SHAPES = {
   S:[[0,1,1],[1,1,0]], T:[[0,1,0],[1,1,1]], Z:[[1,1,0],[0,1,1]]
 };
 
+const joinModal = document.getElementById('joinModal');
+const joinForm = document.getElementById('joinForm');
+const nicknameInput = document.getElementById('nicknameInput');
 const statusEl = document.getElementById('status');
 const restartBtn = document.getElementById('restartBtn');
 const chatBox = document.getElementById('chatBox');
@@ -304,6 +389,8 @@ const chatForm = document.getElementById('chatForm');
 const chatInput = document.getElementById('chatInput');
 let myPlayer = null;
 let connectedPlayers = [];
+let playerNames = {};
+let myNickname = '';
 let paused = false;
 let finished = false;
 let animationId;
@@ -321,7 +408,7 @@ const players = [1,2,3,4,5].map(n => createPlayer(
 ));
 
 function createPlayer(num, canvas, nextCanvas, scoreEl, linesEl, comboEl, stateEl) {
-  return { num, name: num + 'P', areaEl: document.getElementById('area' + num), canvas, ctx: canvas.getContext('2d'), nextCanvas, nextCtx: nextCanvas.getContext('2d'), scoreEl, linesEl, comboEl, stateEl, board: createBoard(), piece: null, nextPiece: null, score: 0, lines: 0, combo: 0, level: 1, dropCounter: 0, dropInterval: 900, lost: false, active: false };
+  return { num, name: num + 'P', nameEl: document.getElementById('p' + num + 'Name'), scoreNameEl: document.getElementById('s' + num + 'Name'), areaEl: document.getElementById('area' + num), canvas, ctx: canvas.getContext('2d'), nextCanvas, nextCtx: nextCanvas.getContext('2d'), scoreEl, linesEl, comboEl, stateEl, board: createBoard(), piece: null, nextPiece: null, score: 0, lines: 0, combo: 0, level: 1, dropCounter: 0, dropInterval: 900, lost: false, active: false };
 }
 function createBoard() { return Array.from({length: ROWS}, () => Array(COLS).fill(null)); }
 function getPlayer(num) { return players[num - 1]; }
@@ -499,7 +586,16 @@ function lose(player) {
   checkWinner();
   drawAll();
 }
+function updatePlayerNames() {
+  players.forEach(p => {
+    const displayName = playerNames[p.num] ? p.num + 'P ' + playerNames[p.num] : p.num + 'P';
+    p.name = displayName;
+    p.nameEl.textContent = displayName;
+    p.scoreNameEl.textContent = displayName;
+  });
+}
 function updateStates() {
+  updatePlayerNames();
   players.forEach(p => {
     p.areaEl.classList.remove('is-mine', 'is-opponent');
     if (myPlayer && p.num === myPlayer) p.areaEl.classList.add('is-mine');
@@ -556,13 +652,17 @@ function connect() {
     if (data.type === 'assign') {
       myPlayer = data.player;
       restartBtn.disabled = false;
-      statusEl.textContent = myPlayer + 'P로 접속됨. 새 게임을 누르세요.';
+      joinModal.classList.remove('hidden');
+      joinModal.classList.add('show');
+      statusEl.textContent = myPlayer + 'P로 접속됨. 이름을 입력하고 입장하세요.';
+      setTimeout(function () { nicknameInput.focus(); }, 50);
       updateStates(); drawAll();
     }
     if (data.type === 'full') statusEl.textContent = '이미 5명이 접속 중입니다.';
     if (data.type === 'system') addChatLine('system', data.message);
     if (data.type === 'players') {
-      connectedPlayers = data.players;
+      connectedPlayers = data.players || [];
+      playerNames = Object.assign({}, playerNames, data.names || {});
       players.forEach(p => p.active = connectedPlayers.includes(p.num));
       updateStates(); drawAll();
     }
@@ -583,7 +683,7 @@ function connect() {
       checkWinner(); drawAll();
     }
     if (data.type === 'chat') {
-      addChatLine('chat', data.player + 'P: ' + data.message);
+      addChatLine('chat', (data.nickname || data.player + 'P') + ': ' + data.message);
     }
   };
   ws.onclose = () => { statusEl.textContent = '서버 연결이 끊겼습니다.'; };
@@ -603,6 +703,17 @@ document.addEventListener('keydown', (e) => {
   drawAll(); syncMine();
 });
 restartBtn.addEventListener('click', restartGame);
+joinForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  if (!myPlayer) return;
+  myNickname = nicknameInput.value.trim().slice(0, 12) || ('Player' + myPlayer);
+  send({ type: 'join', nickname: myNickname });
+  playerNames[myPlayer] = myNickname;
+  updatePlayerNames();
+  joinModal.classList.remove('show');
+  joinModal.classList.add('hidden');
+  statusEl.textContent = myPlayer + 'P ' + myNickname + ' 입장 완료. 새 게임을 누르세요.';
+});
 chatForm.addEventListener('submit', (e) => {
   e.preventDefault();
   const message = chatInput.value.trim();
