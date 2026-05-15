@@ -108,7 +108,7 @@ app.get('/', (req, res) => {
     .game-wrap {
       width: min(1720px, 100%);
       display: grid;
-      grid-template-columns: repeat(5, 1fr) 280px;
+      grid-template-columns: 1.7fr repeat(4, 0.75fr) 280px;
       gap: 16px;
       padding: 18px;
       border-radius: 24px;
@@ -116,7 +116,15 @@ app.get('/', (req, res) => {
       box-shadow: 0 24px 80px rgba(0,0,0,.45);
       border: 1px solid rgba(148,163,184,.18);
     }
-    .player-area { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+    .player-area { display: flex; flex-direction: column; align-items: center; gap: 10px; transition: transform .2s ease, opacity .2s ease; }
+    .player-area.is-mine { grid-row: span 2; }
+    .player-area.is-mine canvas[id^="board"] { max-width: 420px; border-color: #38bdf8; }
+    .player-area.is-mine .player-title { border-color: #38bdf8; box-shadow: 0 0 0 1px rgba(56,189,248,.35); }
+    .player-area.is-opponent { opacity: .9; }
+    .player-area.is-opponent canvas[id^="board"] { max-width: 190px; }
+    .player-area.is-opponent .preview-card { width: 92px; }
+    .player-area.is-opponent .preview-label { font-size: 11px; }
+    .player-area.is-opponent .player-title strong { font-size: 16px; }
     .player-title {
       width: 100%;
       display: flex;
@@ -193,13 +201,14 @@ app.get('/', (req, res) => {
     @media (max-width: 1100px) {
       .game-wrap { grid-template-columns: 1fr; }
       .panel { order: -1; }
-      canvas { max-width: 260px; }
+      .player-area.is-mine canvas[id^="board"] { max-width: 320px; }
+      .player-area.is-opponent canvas[id^="board"] { max-width: 180px; }
     }
   </style>
 </head>
 <body>
   <main class="game-wrap">
-    <section class="player-area">
+    <section class="player-area" id="area1">
       <div class="player-title"><strong>1P</strong><span id="p1State">대기중</span></div>
       <canvas id="board1" width="300" height="600"></canvas>
       <div class="preview-card">
@@ -207,7 +216,7 @@ app.get('/', (req, res) => {
         <canvas id="next1" width="120" height="90"></canvas>
       </div>
     </section>
-    <section class="player-area">
+    <section class="player-area" id="area2">
       <div class="player-title"><strong>2P</strong><span id="p2State">대기중</span></div>
       <canvas id="board2" width="300" height="600"></canvas>
       <div class="preview-card">
@@ -215,7 +224,7 @@ app.get('/', (req, res) => {
         <canvas id="next2" width="120" height="90"></canvas>
       </div>
     </section>
-    <section class="player-area">
+    <section class="player-area" id="area3">
       <div class="player-title"><strong>3P</strong><span id="p3State">대기중</span></div>
       <canvas id="board3" width="300" height="600"></canvas>
       <div class="preview-card">
@@ -223,7 +232,7 @@ app.get('/', (req, res) => {
         <canvas id="next3" width="120" height="90"></canvas>
       </div>
     </section>
-    <section class="player-area">
+    <section class="player-area" id="area4">
       <div class="player-title"><strong>4P</strong><span id="p4State">대기중</span></div>
       <canvas id="board4" width="300" height="600"></canvas>
       <div class="preview-card">
@@ -231,7 +240,7 @@ app.get('/', (req, res) => {
         <canvas id="next4" width="120" height="90"></canvas>
       </div>
     </section>
-    <section class="player-area">
+    <section class="player-area" id="area5">
       <div class="player-title"><strong>5P</strong><span id="p5State">대기중</span></div>
       <canvas id="board5" width="300" height="600"></canvas>
       <div class="preview-card">
@@ -312,7 +321,7 @@ const players = [1,2,3,4,5].map(n => createPlayer(
 ));
 
 function createPlayer(num, canvas, nextCanvas, scoreEl, linesEl, comboEl, stateEl) {
-  return { num, name: num + 'P', canvas, ctx: canvas.getContext('2d'), nextCanvas, nextCtx: nextCanvas.getContext('2d'), scoreEl, linesEl, comboEl, stateEl, board: createBoard(), piece: null, nextPiece: null, score: 0, lines: 0, combo: 0, level: 1, dropCounter: 0, dropInterval: 900, lost: false, active: false };
+  return { num, name: num + 'P', areaEl: document.getElementById('area' + num), canvas, ctx: canvas.getContext('2d'), nextCanvas, nextCtx: nextCanvas.getContext('2d'), scoreEl, linesEl, comboEl, stateEl, board: createBoard(), piece: null, nextPiece: null, score: 0, lines: 0, combo: 0, level: 1, dropCounter: 0, dropInterval: 900, lost: false, active: false };
 }
 function createBoard() { return Array.from({length: ROWS}, () => Array(COLS).fill(null)); }
 function getPlayer(num) { return players[num - 1]; }
@@ -492,6 +501,9 @@ function lose(player) {
 }
 function updateStates() {
   players.forEach(p => {
+    p.areaEl.classList.remove('is-mine', 'is-opponent');
+    if (myPlayer && p.num === myPlayer) p.areaEl.classList.add('is-mine');
+    else p.areaEl.classList.add('is-opponent');
     if (!connectedPlayers.includes(p.num)) {
       p.active = false;
       p.stateEl.textContent = '대기중';
