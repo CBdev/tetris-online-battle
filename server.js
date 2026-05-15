@@ -17,6 +17,7 @@ const PORT = process.env.PORT || 3000;
 const MAX_PLAYERS = 5;
 
 const clients = new Map();
+let gameRunning = false;
 
 function getLocalIp() {
   const nets = os.networkInterfaces();
@@ -72,14 +73,20 @@ wss.on('connection', (ws) => {
     return;
   }
 
-  clients.set(ws, { player, nickname: player + 'P' });
-  ws.send(JSON.stringify({ type: 'assign', player, maxPlayers: MAX_PLAYERS }));
+  clients.set(ws, { player, nickname: player + 'P', soloMode: gameRunning });
+  ws.send(JSON.stringify({ type: 'assign', player, maxPlayers: MAX_PLAYERS, soloMode: gameRunning }));
   broadcast({ type: 'system', message: player + 'P 접속' });
   sendPlayers();
 
   ws.on('message', (message) => {
     let data;
     try { data = JSON.parse(message); } catch { return; }
+
+    if (data.type === 'gameOver') {
+      gameRunning = false;
+      broadcast({ type: 'system', message: '대전 종료. 새 게임부터 전체 참여 가능합니다.' });
+      return;
+    }
 
     if (data.type === 'join') {
       const info = clients.get(ws);
@@ -90,7 +97,15 @@ wss.on('connection', (ws) => {
       return;
     }
 
-    if (['state', 'attack', 'lose', 'restart', 'chat'].includes(data.type)) {
+    if (data.type === 'restart') {
+      gameRunning = true;
+      for (const info of clients.values()) info.soloMode = false;
+      const info = clients.get(ws);
+      broadcast({ ...data, player, nickname: info ? info.nickname : player + 'P' });
+      return;
+    }
+
+    if (['state', 'aiState', 'attack', 'lose', 'chat'].includes(data.type)) {
       const info = clients.get(ws);
       broadcast({ ...data, player, nickname: info ? info.nickname : player + 'P' });
     }
@@ -167,7 +182,7 @@ app.get('/', (req, res) => {
       width: min(1900px, calc(100vw - 20px));
       height: min(1060px, calc(100vh - 20px));
       display: grid;
-      grid-template-columns: 390px 1fr 1fr 330px;
+      grid-template-columns: 390px 220px 220px 1fr;
       grid-template-rows: repeat(2, 1fr);
       gap: 14px;
       padding: 14px;
@@ -196,8 +211,9 @@ app.get('/', (req, res) => {
     }
     .player-area.is-mine .preview-card { width: 120px; }
     .player-area.is-opponent {
-      width: 100%;
-      height: 100%;
+      width: fit-content;
+      min-width: 0;
+      height: fit-content;
       max-width: 100%;
       display: grid;
       grid-template-columns: auto auto;
@@ -215,8 +231,8 @@ app.get('/', (req, res) => {
       overflow: hidden;
     }
     .player-area.is-opponent canvas[id^="board"] {
-      width: 145px;
-      max-width: 145px;
+      width: 112px;
+      max-width: 112px;
       align-self: center;
       grid-column: 1;
       grid-row: 2;
@@ -229,7 +245,7 @@ app.get('/', (req, res) => {
       grid-row: 1;
     }
     .player-area.is-opponent .preview-card {
-      width: 70px;
+      width: 54px;
       padding: 3px;
       grid-column: 2;
       grid-row: 2;
@@ -272,15 +288,25 @@ app.get('/', (req, res) => {
       aspect-ratio: 1 / 2;
       display: block;
     }
-    .panel { grid-column: 4; grid-row: 1 / 3; display: flex; flex-direction: column; gap: 9px; min-width: 0; max-height: 100%; overflow-y: auto; padding-right: 4px; }
-    h1 { margin: 0; font-size: 22px; line-height: 1.2; letter-spacing: -0.04em; text-align: center; }
-    .card { padding: 10px; border-radius: 16px; background: rgba(30,41,59,.82); border: 1px solid rgba(148,163,184,.16); }
+    .panel {
+      grid-column: 4;
+      grid-row: 1 / 3;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-width: 0;
+      max-height: 100%;
+      overflow-y: auto;
+      padding: 4px 8px 4px 4px;
+    }
+    h1 { margin: 0; font-size: 28px; line-height: 1.2; letter-spacing: -0.04em; text-align: center; }
+    .card { padding: 14px; border-radius: 16px; background: rgba(30,41,59,.82); border: 1px solid rgba(148,163,184,.16); }
     .status { min-height: 42px; color: #fbbf24; font-weight: 800; text-align: center; line-height: 1.4; }
     .score-list { display: grid; gap: 5px; }
     .score-row { display: grid; grid-template-columns: 78px 1fr 1fr 1fr; gap: 5px; align-items: center; font-size: 12px; }
     .score-row strong { font-size: 15px; }
     .label { color: #94a3b8; font-size: 12px; }
-    .controls, .rule { line-height: 1.38; font-size: 12px; color: #cbd5e1; }
+    .controls, .rule { line-height: 1.55; font-size: 14px; color: #cbd5e1; }
     .controls strong { color: #f8fafc; }
     button {
       width: 100%; border: 0; border-radius: 14px; padding: 12px 14px;
@@ -310,7 +336,7 @@ app.get('/', (req, res) => {
       border-radius: 10px;
       border: 1px solid #334155;
     }
-    .chat-box { height: 115px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 4px; }
+    .chat-box { height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 4px; }
     .chat-line { font-size: 12px; line-height: 1.4; color: #e2e8f0; word-break: break-word; }
     .chat-line.system { color: #fbbf24; }
     .chat-form { display: flex; gap: 6px; margin-top: 10px; }
@@ -330,7 +356,7 @@ app.get('/', (req, res) => {
       .game-wrap {
         width: 100%;
         height: calc(100vh - 12px);
-        grid-template-columns: 330px minmax(240px, 1fr) 270px;
+        grid-template-columns: 320px 180px 180px 1fr;
         grid-template-rows: repeat(2, 1fr);
         gap: 8px;
         padding: 8px;
@@ -343,8 +369,8 @@ app.get('/', (req, res) => {
         row-gap: 3px;
         padding: 6px;
       }
-      .player-area.is-opponent canvas[id^="board"] { width: 100px; max-width: 100px; }
-      .player-area.is-opponent .preview-card { display: block; width: 58px; padding: 3px; }
+      .player-area.is-opponent canvas[id^="board"] { width: 84px; max-width: 84px; }
+      .player-area.is-opponent .preview-card { display: block; width: 46px; padding: 2px; }
       .player-area.is-opponent .preview-label { font-size: 9px; }
       .player-area.is-opponent .player-title { padding: 5px 6px; }
       .player-area.is-opponent .player-title strong { font-size: 11px; max-width: 86px; }
@@ -495,6 +521,8 @@ let myPlayer = null;
 let connectedPlayers = [];
 let playerNames = {};
 let myNickname = '';
+let soloMode = false;
+let gameHost = null;
 let paused = false;
 let finished = false;
 let gameTimer = null;
@@ -513,7 +541,7 @@ const players = [1,2,3,4,5].map(n => createPlayer(
 ));
 
 function createPlayer(num, canvas, nextCanvas, scoreEl, linesEl, comboEl, stateEl) {
-  return { num, name: num + 'P', nameEl: document.getElementById('p' + num + 'Name'), scoreNameEl: document.getElementById('s' + num + 'Name'), areaEl: document.getElementById('area' + num), canvas, ctx: canvas.getContext('2d'), nextCanvas, nextCtx: nextCanvas.getContext('2d'), scoreEl, linesEl, comboEl, stateEl, board: createBoard(), piece: null, nextPiece: null, score: 0, lines: 0, combo: 0, level: 1, dropCounter: 0, dropInterval: 900, lost: false, active: false };
+  return { num, name: num + 'P', nameEl: document.getElementById('p' + num + 'Name'), scoreNameEl: document.getElementById('s' + num + 'Name'), areaEl: document.getElementById('area' + num), canvas, ctx: canvas.getContext('2d'), nextCanvas, nextCtx: nextCanvas.getContext('2d'), scoreEl, linesEl, comboEl, stateEl, board: createBoard(), piece: null, nextPiece: null, score: 0, lines: 0, combo: 0, level: 1, dropCounter: 0, dropInterval: 900, lost: false, active: false, ai: false, aiMoveCounter: 0, aiPlan: null };  
 }
 function createBoard() { return Array.from({length: ROWS}, () => Array(COLS).fill(null)); }
 function getPlayer(num) { return players[num - 1]; }
@@ -590,7 +618,16 @@ function mergePiece(player) {
   }));
 }
 function aliveOpponents() {
+  if (soloMode) return [];
   return players.filter(p => p.active && !p.lost && p.num !== myPlayer);
+}
+function isHost() {
+  return !soloMode && myPlayer && gameHost === myPlayer;
+}
+function syncAiPlayer(player) {
+  if (isHost() && player.ai) {
+    send({ type:'aiState', aiPlayer: player.num, state: serializePlayer(player) });
+  }
 }
 function clearLines(player) {
   let cleared = 0;
@@ -613,7 +650,7 @@ function clearLines(player) {
     if (player.combo >= 3) attackCount += 1;
     if (player.combo >= 5) attackCount += 1;
     const targets = aliveOpponents();
-    if (attackCount > 0 && targets.length > 0) {
+    if (!soloMode && attackCount > 0 && targets.length > 0) {
       const target = targets[Math.floor(Math.random() * targets.length)].num;
       send({ type:'attack', count: attackCount, target });
       addChatLine('system', player.name + ' → ' + target + 'P 공격줄 ' + attackCount + '개');
@@ -680,28 +717,29 @@ function applyRemoteState(player, state) {
   updatePanel(player); updateStates();
 }
 function send(data) { if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(data)); }
-function syncMine() { if (myPlayer) send({ type:'state', state: serializePlayer(getMine()) }); }
+function syncMine() { if (myPlayer && !soloMode) send({ type:'state', state: serializePlayer(getMine()) }); }
 function checkWinner() {
   const activeAlive = players.filter(p => p.active && !p.lost);
-  if (connectedPlayers.length >= 2 && activeAlive.length === 1) {
+  if (!soloMode && connectedPlayers.length >= 2 && activeAlive.length === 1) {
     finished = true;
     activeAlive[0].stateEl.innerHTML = '<span class="winner">승리</span>';
     statusEl.textContent = activeAlive[0].name + ' 승리!';
     drawAll();
     stopGameLoop();
+    send({ type:'gameOver' });
   }
 }
 function lose(player) {
   player.lost = true;
   player.stateEl.innerHTML = '<span class="dead">패배</span>';
-  send({ type:'lose' });
+  if (!soloMode) send({ type:'lose' });
   syncMine();
   checkWinner();
   drawAll();
 }
 function updatePlayerNames() {
   players.forEach(p => {
-    const displayName = playerNames[p.num] ? p.num + 'P ' + playerNames[p.num] : p.num + 'P';
+    const displayName = p.ai ? p.num + 'P AI' : (playerNames[p.num] ? p.num + 'P ' + playerNames[p.num] : p.num + 'P');
     p.name = displayName;
     p.nameEl.textContent = displayName;
     p.scoreNameEl.textContent = displayName;
@@ -728,7 +766,10 @@ function updateStates() {
       p.areaEl.style.gridRow = String(opponentGridRow);
       opponentRow++;
     }
-    if (!connectedPlayers.includes(p.num)) {
+    if (p.ai && !p.lost) {
+      p.active = true;
+      p.stateEl.textContent = 'AI';
+    } else if (!connectedPlayers.includes(p.num)) {
       p.active = false;
       p.stateEl.textContent = '대기중';
     } else if (p.num === myPlayer && !p.lost) {
@@ -740,16 +781,30 @@ function updateStates() {
     }
   });
 }
-function startLocalGame() {
+function startLocalGame(forceSolo = false, hostPlayer = myPlayer) {
+  if (forceSolo) soloMode = true;
+  gameHost = soloMode ? null : hostPlayer;
   players.forEach(player => {
     player.board = createBoard(); player.piece = randomPiece(); player.nextPiece = randomPiece(); player.score = 0; player.lines = 0; player.combo = 0; player.level = 1;
-    player.dropCounter = 0; player.dropInterval = 900; player.lost = false; player.active = connectedPlayers.includes(player.num); updatePanel(player);
+    player.dropCounter = 0;
+    player.dropInterval = 900;
+    player.aiMoveCounter = 0;
+    player.aiPlan = null;
+    player.lost = false;
+    player.ai = !soloMode && !connectedPlayers.includes(player.num);
+    player.active = soloMode ? player.num === myPlayer : true;
+    updatePanel(player);
   });
   paused = false; finished = false; lastTime = 0; updateStates();
-  statusEl.textContent = myPlayer + 'P로 플레이 중';
+  statusEl.textContent = soloMode ? '싱글모드 플레이 중 - 다음 새 게임부터 대전 참여' : myPlayer + 'P로 플레이 중';
   stopGameLoop(); startGameLoop(); syncMine(); drawAll();
 }
-function restartGame() { send({ type:'restart' }); startLocalGame(); }
+function restartGame() {
+  soloMode = false;
+  gameHost = myPlayer;
+  send({ type:'restart' });
+  startLocalGame(false, myPlayer);
+}
 function togglePause() {
   if (finished || !myPlayer) return;
   paused = !paused; statusEl.textContent = paused ? '일시정지' : myPlayer + 'P로 플레이 중';
@@ -766,6 +821,107 @@ function stopGameLoop() {
     gameTimer = null;
   }
 }
+function cloneShape(shape) {
+  return shape.map(row => row.slice());
+}
+function rotateShapeClockwise(shape) {
+  return shape[0].map((_, i) => shape.map(row => row[i]).reverse());
+}
+function testCollision(board, shape, x, y) {
+  return shape.some((row, dy) => row.some((cell, dx) => {
+    if (!cell) return false;
+    const px = x + dx;
+    const py = y + dy;
+    return px < 0 || px >= COLS || py >= ROWS || (py >= 0 && board[py][px]);
+  }));
+}
+function cloneBoard(board) {
+  return board.map(row => row.slice());
+}
+function placeShape(board, shape, x, y, type) {
+  const copied = cloneBoard(board);
+  shape.forEach((row, dy) => row.forEach((cell, dx) => {
+    if (cell && y + dy >= 0) copied[y + dy][x + dx] = type;
+  }));
+  return copied;
+}
+function countClearedLines(board) {
+  return board.filter(row => row.every(Boolean)).length;
+}
+function boardStats(board) {
+  const heights = [];
+  let holes = 0;
+  for (let x = 0; x < COLS; x++) {
+    let blockFound = false;
+    let height = 0;
+    for (let y = 0; y < ROWS; y++) {
+      if (board[y][x]) {
+        if (!blockFound) height = ROWS - y;
+        blockFound = true;
+      } else if (blockFound) {
+        holes++;
+      }
+    }
+    heights.push(height);
+  }
+  const aggregateHeight = heights.reduce((a, b) => a + b, 0);
+  let bumpiness = 0;
+  for (let i = 0; i < heights.length - 1; i++) bumpiness += Math.abs(heights[i] - heights[i + 1]);
+  return { aggregateHeight, holes, bumpiness };
+}
+function findBestAiPlan(player) {
+  if (!player.piece) return null;
+  let best = null;
+  let shape = cloneShape(player.piece.shape);
+  for (let rotation = 0; rotation < 4; rotation++) {
+    const width = shape[0].length;
+    for (let x = -2; x <= COLS - width + 2; x++) {
+      let y = 0;
+      if (testCollision(player.board, shape, x, y)) continue;
+      while (!testCollision(player.board, shape, x, y + 1)) y++;
+      const simulated = placeShape(player.board, shape, x, y, player.piece.type);
+      const cleared = countClearedLines(simulated);
+      const stats = boardStats(simulated);
+      const score = cleared * 120 - stats.holes * 55 - stats.aggregateHeight * 4 - stats.bumpiness * 8;
+      if (!best || score > best.score) best = { x, rotation, score };
+    }
+    shape = rotateShapeClockwise(shape);
+  }
+  return best || { x: Math.floor(COLS / 2), rotation: 0, score: 0 };
+}
+function updateAiPlayer(player, delta) {
+  if (!isHost() || !player.ai || player.lost || !player.active) return;
+
+  if (!player.aiPlan || player.aiPlan.pieceType !== player.piece.type || player.aiPlan.startY !== player.piece.y) {
+    const plan = findBestAiPlan(player);
+    player.aiPlan = { ...plan, pieceType: player.piece.type, startY: player.piece.y, rotated: 0 };
+  }
+
+  player.aiMoveCounter += delta;
+  if (player.aiMoveCounter > 95) {
+    if (player.aiPlan.rotated < player.aiPlan.rotation) {
+      const originalDirection = rotateDirection;
+      rotateDirection = 'cw';
+      rotatePiece(player);
+      rotateDirection = originalDirection;
+      player.aiPlan.rotated++;
+    } else if (player.piece.x < player.aiPlan.x) {
+      movePiece(player, 1);
+    } else if (player.piece.x > player.aiPlan.x) {
+      movePiece(player, -1);
+    } else {
+      dropPiece(player);
+    }
+    player.aiMoveCounter = 0;
+  }
+
+  player.dropCounter += delta;
+  while (player.dropCounter > player.dropInterval * 0.65) {
+    dropPiece(player);
+    player.dropCounter -= player.dropInterval * 0.65;
+  }
+  syncAiPlayer(player);
+}
 function update() {
   if (finished || paused || !myPlayer) return;
   const mine = getMine();
@@ -776,6 +932,9 @@ function update() {
   while (mine.dropCounter > mine.dropInterval) {
     dropPiece(mine);
     mine.dropCounter -= mine.dropInterval;
+  }
+  if (isHost()) {
+    players.forEach(p => updateAiPlayer(p, delta));
   }
   drawAll(); syncMine(); checkWinner();
 }
@@ -794,10 +953,11 @@ function connect() {
     const data = JSON.parse(event.data);
     if (data.type === 'assign') {
       myPlayer = data.player;
+      soloMode = !!data.soloMode;
       restartBtn.disabled = false;
       joinModal.classList.remove('hidden');
       joinModal.classList.add('show');
-      statusEl.textContent = myPlayer + 'P로 접속됨. 이름을 입력하고 입장하세요.';
+      statusEl.textContent = soloMode ? myPlayer + 'P로 접속됨. 현재 대전 중이므로 싱글모드로 입장합니다.' : myPlayer + 'P로 접속됨. 이름을 입력하고 입장하세요.';
       setTimeout(function () { nicknameInput.focus(); }, 50);
       updateStates(); drawAll();
     }
@@ -809,17 +969,35 @@ function connect() {
       players.forEach(p => p.active = connectedPlayers.includes(p.num));
       updateStates(); drawAll();
     }
-    if (data.type === 'restart') startLocalGame();
-    if (data.type === 'state' && data.player !== myPlayer) {
+    if (data.type === 'restart') {
+      soloMode = false;
+      gameHost = data.player;
+      startLocalGame(false, data.player);
+    }
+    if (!soloMode && data.type === 'state' && data.player !== myPlayer) {
       applyRemoteState(getPlayer(data.player), data.state);
       drawAll(); checkWinner();
     }
-    if (data.type === 'attack' && data.target === myPlayer) {
+    if (!soloMode && data.type === 'aiState' && data.aiPlayer) {
+      const aiPlayer = getPlayer(data.aiPlayer);
+      aiPlayer.ai = true;
+      applyRemoteState(aiPlayer, data.state);
+      drawAll(); checkWinner();
+    }
+    if (!soloMode && data.type === 'attack' && data.target === myPlayer) {
       addGarbageLines(getMine(), data.count);
       addChatLine('system', data.player + 'P에게 공격받음: ' + data.count + '줄');
       syncMine(); drawAll();
     }
-    if (data.type === 'lose') {
+    if (!soloMode && isHost() && data.type === 'attack' && data.target !== myPlayer) {
+      const targetPlayer = getPlayer(data.target);
+      if (targetPlayer && targetPlayer.ai) {
+        addGarbageLines(targetPlayer, data.count);
+        syncAiPlayer(targetPlayer);
+        drawAll();
+      }
+    }
+    if (!soloMode && data.type === 'lose') {
       const p = getPlayer(data.player);
       p.lost = true;
       p.stateEl.innerHTML = '<span class="dead">패배</span>';
@@ -864,7 +1042,12 @@ joinForm.addEventListener('submit', (e) => {
   updatePlayerNames();
   joinModal.classList.remove('show');
   joinModal.classList.add('hidden');
-  statusEl.textContent = myPlayer + 'P ' + myNickname + ' 입장 완료. 새 게임을 누르세요.';
+  if (soloMode) {
+    statusEl.textContent = myPlayer + 'P ' + myNickname + ' 싱글모드 입장 완료.';
+    startLocalGame(true);
+  } else {
+    statusEl.textContent = myPlayer + 'P ' + myNickname + ' 입장 완료. 새 게임을 누르세요.';
+  }
 });
 chatForm.addEventListener('submit', (e) => {
   e.preventDefault();
