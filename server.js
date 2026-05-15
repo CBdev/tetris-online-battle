@@ -113,6 +113,11 @@ app.get('/', (req, res) => {
   <title>5인 온라인 대전 테트리스</title>
   <style>
     * { box-sizing: border-box; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
     body {
       margin: 0;
       min-height: 100vh;
@@ -122,7 +127,7 @@ app.get('/', (req, res) => {
       display: flex;
       justify-content: center;
       align-items: flex-start;
-      padding: 16px;
+      padding: 10px;
     }
     .join-modal {
       position: fixed;
@@ -159,25 +164,62 @@ app.get('/', (req, res) => {
       text-align: center;
     }
     .game-wrap {
-      width: min(100%, 1600px);
+      width: min(1900px, calc(100vw - 20px));
+      height: min(1060px, calc(100vh - 20px));
       display: grid;
-      grid-template-columns: minmax(300px, 1.4fr) repeat(4, minmax(120px, .65fr)) minmax(260px, 300px);
-      gap: 12px;
+      grid-template-columns: 390px 1fr 330px;
+      grid-template-rows: 1fr;
+      grid-template-areas: "mine opponents panel";
+      gap: 14px;
       padding: 14px;
       border-radius: 24px;
       background: rgba(15, 23, 42, 0.9);
       box-shadow: 0 24px 80px rgba(0,0,0,.45);
       border: 1px solid rgba(148,163,184,.18);
     }
-    .player-area { display: flex; flex-direction: column; align-items: center; gap: 10px; transition: transform .2s ease, opacity .2s ease; }
-    .player-area.is-mine { grid-row: span 2; }
-    .player-area.is-mine canvas[id^="board"] { max-width: min(420px, 100%); border-color: #38bdf8; }
-    .player-area.is-mine .player-title { border-color: #38bdf8; box-shadow: 0 0 0 1px rgba(56,189,248,.35); }
-    .player-area.is-opponent { opacity: .9; }
-    .player-area.is-opponent canvas[id^="board"] { max-width: min(180px, 100%); }
-    .player-area.is-opponent .preview-card { width: 92px; }
-    .player-area.is-opponent .preview-label { font-size: 11px; }
-    .player-area.is-opponent .player-title strong { font-size: 16px; }
+    .player-area { display: flex; flex-direction: column; align-items: center; gap: 8px; transition: transform .2s ease, opacity .2s ease; min-height: 0; }
+    .player-area.is-mine {
+      grid-area: mine;
+      align-self: start;
+      justify-self: center;
+      width: 100%;
+    }
+    .player-area.is-mine canvas[id^="board"] {
+      width: 360px;
+      max-width: max-width: 360px;er-color: #38bdf8;
+    }
+    .player-area.is-mine .player-title {
+      max-width: 430px;
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 1px rgba(56,189,248,.35);
+    }
+    .player-area.is-mine .preview-card { width: 120px; }
+    .player-area.is-opponent {
+      grid-area: opponents;
+      width: 100%;
+      max-width: 100%;
+      display: grid;
+      grid-template-columns: 122px 1fr;
+      align-items: center;
+      justify-items: start;
+      column-gap: 10px;
+      opacity: .92;
+    }
+    .player-area.is-opponent canvas[id^="board"] {
+      width: 120px;
+      max-width: 120px;
+      grid-row: 1 / span 2;
+    }
+    .player-area.is-opponent .player-title {
+      width: 100%;
+      padding: 7px 9px;
+    }
+    .player-area.is-opponent .preview-card {
+      width: 78px;
+      padding: 5px;
+    }
+    .player-area.is-opponent .preview-label { font-size: 10px; margin-bottom: 3px; }
+    .player-area.is-opponent .player-title strong { font-size: 14px; }
     .player-title {
       width: 100%;
       display: flex;
@@ -201,16 +243,17 @@ app.get('/', (req, res) => {
       max-width: 300px;
       height: auto;
       aspect-ratio: 1 / 2;
+      display: block;
     }
-    .panel { display: flex; flex-direction: column; gap: 12px; }
-    h1 { margin: 0; font-size: 24px; line-height: 1.2; letter-spacing: -0.04em; text-align: center; }
-    .card { padding: 14px; border-radius: 16px; background: rgba(30,41,59,.82); border: 1px solid rgba(148,163,184,.16); }
+    .panel { grid-area: panel; display: flex; flex-direction: column; gap: 9px; min-width: 0; max-height: 100%; overflow: hidden; }
+    h1 { margin: 0; font-size: 22px; line-height: 1.2; letter-spacing: -0.04em; text-align: center; }
+    .card { padding: 10px; border-radius: 16px; background: rgba(30,41,59,.82); border: 1px solid rgba(148,163,184,.16); }
     .status { min-height: 42px; color: #fbbf24; font-weight: 800; text-align: center; line-height: 1.4; }
-    .score-list { display: grid; gap: 8px; }
-    .score-row { display: grid; grid-template-columns: 38px 1fr 1fr 1fr; gap: 6px; align-items: center; font-size: 13px; }
+    .score-list { display: grid; gap: 5px; }
+    .score-row { display: grid; grid-template-columns: 78px 1fr 1fr 1fr; gap: 5px; align-items: center; font-size: 12px; }
     .score-row strong { font-size: 15px; }
     .label { color: #94a3b8; font-size: 12px; }
-    .controls, .rule { line-height: 1.65; font-size: 13px; color: #cbd5e1; }
+    .controls, .rule { line-height: 1.38; font-size: 12px; color: #cbd5e1; }
     .controls strong { color: #f8fafc; }
     button {
       width: 100%; border: 0; border-radius: 14px; padding: 12px 14px;
@@ -237,8 +280,8 @@ app.get('/', (req, res) => {
       border-radius: 10px;
       border: 1px solid #334155;
     }
-    .chat-box { height: 140px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 4px; }
-    .chat-line { font-size: 13px; line-height: 1.4; color: #e2e8f0; word-break: break-word; }
+    .chat-box { height: 115px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 4px; }
+    .chat-line { font-size: 12px; line-height: 1.4; color: #e2e8f0; word-break: break-word; }
     .chat-line.system { color: #fbbf24; }
     .chat-form { display: flex; gap: 6px; margin-top: 10px; }
     .chat-form input {
@@ -252,28 +295,51 @@ app.get('/', (req, res) => {
       outline: none;
     }
     .chat-form button { width: 58px; padding: 10px; }
-    @media (max-width: 1350px) {
-      body { padding: 8px; }
+    @media (max-width: 1600px) {
+      body { padding: 6px; }
       .game-wrap {
-        grid-template-columns: minmax(280px, 1.25fr) repeat(2, minmax(120px, .55fr)) minmax(250px, 280px);
-        gap: 10px;
-        padding: 10px;
+        width: 100%;
+        height: calc(100vh - 12px);
+        grid-template-columns: 330px minmax(240px, 1fr) 270px;
+        gap: 8px;
+        padding: 8px;
       }
-      .player-area.is-mine { grid-row: span 2; }
-      .player-area.is-opponent canvas[id^="board"] { max-width: 150px; }
+      .player-area.is-mine canvas[id^="board"] { width: 310px; max-width: 310px; }
+      .player-area.is-mine .player-title { max-width: 310px; }
+      .player-area.is-opponent {
+        grid-template-columns: 88px 1fr;
+        column-gap: 6px;
+        gap: 5px;
+      }
+      .player-area.is-opponent canvas[id^="board"] { width: 86px; max-width: 86px; }
       .player-area.is-opponent .preview-card { display: none; }
-      .panel { grid-row: span 2; }
-      h1 { font-size: 20px; }
-      .card { padding: 10px; }
-      .controls, .rule { font-size: 12px; line-height: 1.45; }
-      .chat-box { height: 110px; }
+      .player-area.is-opponent .player-title { padding: 6px 8px; }
+      .player-area.is-opponent .player-title strong { font-size: 12px; }
+      h1 { font-size: 18px; }
+      .card { padding: 8px; }
+      .score-row { font-size: 12px; grid-template-columns: 60px 1fr 1fr 1fr; }
+      .controls, .rule { font-size: 11px; line-height: 1.35; }
+      .chat-box { height: 85px; }
+      .preview-card { width: 105px; padding: 6px; }
     }
     @media (max-width: 900px) {
-      .game-wrap { grid-template-columns: 1fr 1fr; }
-      .panel { order: -1; grid-column: 1 / -1; grid-row: auto; }
-      .player-area.is-mine { grid-column: 1 / -1; grid-row: auto; }
+      html, body { overflow-y: auto; }
+      body { height: auto; min-height: 100vh; overflow-y: auto; }
+      .game-wrap {
+        height: auto;
+        grid-template-columns: 1fr;
+        grid-template-areas:
+          "panel"
+          "mine"
+          "opponents";
+      }
       .player-area.is-mine canvas[id^="board"] { max-width: 300px; }
-      .player-area.is-opponent canvas[id^="board"] { max-width: 135px; }
+      .player-area.is-opponent {
+        grid-template-columns: 95px 1fr;
+        max-width: 360px;
+        justify-self: center;
+      }
+      .player-area.is-opponent canvas[id^="board"] { width: 95px; max-width: 95px; }
     }
   </style>
 </head>
@@ -596,10 +662,16 @@ function updatePlayerNames() {
 }
 function updateStates() {
   updatePlayerNames();
+  let opponentOrder = 2;
   players.forEach(p => {
     p.areaEl.classList.remove('is-mine', 'is-opponent');
-    if (myPlayer && p.num === myPlayer) p.areaEl.classList.add('is-mine');
-    else p.areaEl.classList.add('is-opponent');
+    if (myPlayer && p.num === myPlayer) {
+      p.areaEl.classList.add('is-mine');
+      p.areaEl.style.order = '1';
+    } else {
+      p.areaEl.classList.add('is-opponent');
+      p.areaEl.style.order = String(opponentOrder++);
+    }
     if (!connectedPlayers.includes(p.num)) {
       p.active = false;
       p.stateEl.textContent = '대기중';
