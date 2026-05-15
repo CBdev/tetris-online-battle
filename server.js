@@ -168,8 +168,7 @@ app.get('/', (req, res) => {
       height: min(1060px, calc(100vh - 20px));
       display: grid;
       grid-template-columns: 390px 1fr 330px;
-      grid-template-rows: 1fr;
-      grid-template-areas: "mine opponents panel";
+      grid-template-rows: repeat(4, 1fr);
       gap: 14px;
       padding: 14px;
       border-radius: 24px;
@@ -179,23 +178,25 @@ app.get('/', (req, res) => {
     }
     .player-area { display: flex; flex-direction: column; align-items: center; gap: 8px; transition: transform .2s ease, opacity .2s ease; min-height: 0; }
     .player-area.is-mine {
-      grid-area: mine;
+      grid-column: 1;
+      grid-row: 1 / 5;
       align-self: start;
       justify-self: center;
       width: 100%;
     }
     .player-area.is-mine canvas[id^="board"] {
       width: 360px;
-      max-width: max-width: 360px;er-color: #38bdf8;
+      max-width: 360px;
+      border-color: #38bdf8;
     }
     .player-area.is-mine .player-title {
-      max-width: 430px;
+      max-width: 360px;
       border-color: #38bdf8;
       box-shadow: 0 0 0 1px rgba(56,189,248,.35);
     }
     .player-area.is-mine .preview-card { width: 120px; }
     .player-area.is-opponent {
-      grid-area: opponents;
+      grid-column: 2;
       width: 100%;
       max-width: 100%;
       display: grid;
@@ -245,7 +246,7 @@ app.get('/', (req, res) => {
       aspect-ratio: 1 / 2;
       display: block;
     }
-    .panel { grid-area: panel; display: flex; flex-direction: column; gap: 9px; min-width: 0; max-height: 100%; overflow: hidden; }
+    .panel { grid-column: 3; grid-row: 1 / 5; display: flex; flex-direction: column; gap: 9px; min-width: 0; max-height: 100%; overflow: hidden; }
     h1 { margin: 0; font-size: 22px; line-height: 1.2; letter-spacing: -0.04em; text-align: center; }
     .card { padding: 10px; border-radius: 16px; background: rgba(30,41,59,.82); border: 1px solid rgba(148,163,184,.16); }
     .status { min-height: 42px; color: #fbbf24; font-weight: 800; text-align: center; line-height: 1.4; }
@@ -301,6 +302,7 @@ app.get('/', (req, res) => {
         width: 100%;
         height: calc(100vh - 12px);
         grid-template-columns: 330px minmax(240px, 1fr) 270px;
+        grid-template-rows: repeat(4, 1fr);
         gap: 8px;
         padding: 8px;
       }
@@ -328,13 +330,14 @@ app.get('/', (req, res) => {
       .game-wrap {
         height: auto;
         grid-template-columns: 1fr;
-        grid-template-areas:
-          "panel"
-          "mine"
-          "opponents";
+        grid-template-rows: auto;
       }
+      .panel { grid-column: 1 !important; grid-row: auto !important; order: -1; }
+      .player-area.is-mine { grid-column: 1 !important; grid-row: auto !important; }
       .player-area.is-mine canvas[id^="board"] { max-width: 300px; }
       .player-area.is-opponent {
+        grid-column: 1 !important;
+        grid-row: auto !important;
         grid-template-columns: 95px 1fr;
         max-width: 360px;
         justify-self: center;
@@ -662,15 +665,21 @@ function updatePlayerNames() {
 }
 function updateStates() {
   updatePlayerNames();
-  let opponentOrder = 2;
+  let opponentRow = 1;
   players.forEach(p => {
     p.areaEl.classList.remove('is-mine', 'is-opponent');
+    p.areaEl.style.order = '';
+    p.areaEl.style.gridColumn = '';
+    p.areaEl.style.gridRow = '';
+
     if (myPlayer && p.num === myPlayer) {
       p.areaEl.classList.add('is-mine');
-      p.areaEl.style.order = '1';
+      p.areaEl.style.gridColumn = '1';
+      p.areaEl.style.gridRow = '1 / 5';
     } else {
       p.areaEl.classList.add('is-opponent');
-      p.areaEl.style.order = String(opponentOrder++);
+      p.areaEl.style.gridColumn = '2';
+      p.areaEl.style.gridRow = String(opponentRow++);
     }
     if (!connectedPlayers.includes(p.num)) {
       p.active = false;
