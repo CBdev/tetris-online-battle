@@ -397,7 +397,7 @@ function clearLines(player) {
     if (attackCount > 0 && targets.length > 0) {
       const target = targets[Math.floor(Math.random() * targets.length)].num;
       send({ type:'attack', count: attackCount, target });
-      addChatLine('system', `${player.name} → ${target}P 공격줄 ${attackCount}개`);
+      addChatLine('system', player.name + ' → ' + target + 'P 공격줄 ' + attackCount + '개');
     }
   } else {
     player.combo = 0;
