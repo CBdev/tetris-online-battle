@@ -200,11 +200,13 @@ app.get('/', (req, res) => {
       height: 100%;
       max-width: 100%;
       display: grid;
-      grid-template-columns: minmax(0, 1fr) 92px;
+      grid-template-columns: auto auto;
       grid-template-rows: auto 1fr;
       align-items: center;
+      justify-content: center;
       justify-items: center;
-      gap: 6px;
+      column-gap: 2px;
+      row-gap: 4px;
       opacity: .95;
       padding: 8px;
       border-radius: 16px;
@@ -213,7 +215,7 @@ app.get('/', (req, res) => {
       overflow: hidden;
     }
     .player-area.is-opponent canvas[id^="board"] {
-      width: min(100%, 145px);
+      width: 145px;
       max-width: 145px;
       align-self: center;
       grid-column: 1;
@@ -227,13 +229,13 @@ app.get('/', (req, res) => {
       grid-row: 1;
     }
     .player-area.is-opponent .preview-card {
-      width: 82px;
-      padding: 5px;
+      width: 70px;
+      padding: 3px;
       grid-column: 2;
       grid-row: 2;
       align-self: center;
     }
-    .player-area.is-opponent .preview-label { font-size: 10px; margin-bottom: 3px; }
+    .player-area.is-opponent .preview-label { font-size: 9px; margin-bottom: 2px; }
     .player-area.is-opponent .player-title strong {
       font-size: 13px;
       overflow: hidden;
@@ -335,12 +337,13 @@ app.get('/', (req, res) => {
       .player-area.is-mine canvas[id^="board"] { width: 310px; max-width: 310px; }
       .player-area.is-mine .player-title { max-width: 310px; }
       .player-area.is-opponent {
-        grid-template-columns: minmax(0, 1fr) 70px;
-        gap: 4px;
+        grid-template-columns: auto auto;
+        column-gap: 2px;
+        row-gap: 3px;
         padding: 6px;
       }
-      .player-area.is-opponent canvas[id^="board"] { width: min(100%, 100px); max-width: 100px; }
-      .player-area.is-opponent .preview-card { display: block; width: 66px; padding: 4px; }
+      .player-area.is-opponent canvas[id^="board"] { width: 100px; max-width: 100px; }
+      .player-area.is-opponent .preview-card { display: block; width: 58px; padding: 3px; }
       .player-area.is-opponent .preview-label { font-size: 9px; }
       .player-area.is-opponent .player-title { padding: 5px 6px; }
       .player-area.is-opponent .player-title strong { font-size: 11px; max-width: 86px; }
@@ -366,12 +369,12 @@ app.get('/', (req, res) => {
       .player-area.is-opponent {
         grid-column: 1 !important;
         grid-row: auto !important;
-        grid-template-columns: minmax(0, 1fr) 78px;
+        grid-template-columns: auto auto;
         max-width: 360px;
         justify-self: center;
       }
       .player-area.is-opponent canvas[id^="board"] { width: min(100%, 115px); max-width: 115px; }
-      .player-area.is-opponent .preview-card { width: 72px; display: block; }
+      .player-area.is-opponent .preview-card { width: 62px; display: block; }
     }
   </style>
 </head>
