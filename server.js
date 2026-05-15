@@ -543,7 +543,7 @@ function connect() {
     }
     if (data.type === 'attack' && data.target === myPlayer) {
       addGarbageLines(getMine(), data.count);
-      addChatLine('system', `${data.player}P에게 공격받음: ${data.count}줄`);
+      addChatLine('system', data.player + 'P에게 공격받음: ' + data.count + '줄');
       syncMine(); drawAll();
     }
     if (data.type === 'lose') {
@@ -553,7 +553,7 @@ function connect() {
       checkWinner(); drawAll();
     }
     if (data.type === 'chat') {
-      addChatLine('chat', `${data.player}P: ${data.message}`);
+      addChatLine('chat', data.player + 'P: ' + data.message);
     }
   };
   ws.onclose = () => { statusEl.textContent = '서버 연결이 끊겼습니다.'; };
@@ -590,7 +590,7 @@ drawAll();
 server.listen(PORT, '0.0.0.0', () => {
   const ip = getLocalIp();
   console.log('3인 온라인 대전 테트리스 서버 실행 중');
-  console.log(`서버 PC 접속: http://localhost:${PORT}`);
-  console.log(`같은 내부망 접속: http://${ip}:${PORT}`);
+  console.log('서버 PC 접속: http://localhost:' + PORT);
+  console.log('같은 내부망 접속: http://' + ip + ':' + PORT);
   console.log('외부 접속은 Render, Railway, ngrok 등 공개 주소를 사용하세요.');
 });
