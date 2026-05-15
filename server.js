@@ -199,10 +199,11 @@ app.get('/', (req, res) => {
       width: 100%;
       height: 100%;
       max-width: 100%;
-      display: flex;
-      flex-direction: column;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 92px;
+      grid-template-rows: auto 1fr;
       align-items: center;
-      justify-content: space-between;
+      justify-items: center;
       gap: 6px;
       opacity: .95;
       padding: 8px;
@@ -215,17 +216,22 @@ app.get('/', (req, res) => {
       width: min(100%, 145px);
       max-width: 145px;
       align-self: center;
+      grid-column: 1;
+      grid-row: 2;
     }
     .player-area.is-opponent .player-title {
       width: 100%;
       padding: 7px 9px;
       min-width: 0;
-      flex: 0 0 auto;
+      grid-column: 1 / 3;
+      grid-row: 1;
     }
     .player-area.is-opponent .preview-card {
-      width: min(100%, 105px);
+      width: 82px;
       padding: 5px;
-      flex: 0 0 auto;
+      grid-column: 2;
+      grid-row: 2;
+      align-self: center;
     }
     .player-area.is-opponent .preview-label { font-size: 10px; margin-bottom: 3px; }
     .player-area.is-opponent .player-title strong {
@@ -329,11 +335,12 @@ app.get('/', (req, res) => {
       .player-area.is-mine canvas[id^="board"] { width: 310px; max-width: 310px; }
       .player-area.is-mine .player-title { max-width: 310px; }
       .player-area.is-opponent {
+        grid-template-columns: minmax(0, 1fr) 70px;
         gap: 4px;
         padding: 6px;
       }
       .player-area.is-opponent canvas[id^="board"] { width: min(100%, 100px); max-width: 100px; }
-      .player-area.is-opponent .preview-card { display: block; width: min(100%, 78px); padding: 4px; }
+      .player-area.is-opponent .preview-card { display: block; width: 66px; padding: 4px; }
       .player-area.is-opponent .preview-label { font-size: 9px; }
       .player-area.is-opponent .player-title { padding: 5px 6px; }
       .player-area.is-opponent .player-title strong { font-size: 11px; max-width: 86px; }
@@ -359,11 +366,12 @@ app.get('/', (req, res) => {
       .player-area.is-opponent {
         grid-column: 1 !important;
         grid-row: auto !important;
+        grid-template-columns: minmax(0, 1fr) 78px;
         max-width: 360px;
         justify-self: center;
       }
       .player-area.is-opponent canvas[id^="board"] { width: min(100%, 115px); max-width: 115px; }
-      .player-area.is-opponent .preview-card { width: min(100%, 90px); display: block; }
+      .player-area.is-opponent .preview-card { width: 72px; display: block; }
     }
   </style>
 </head>
