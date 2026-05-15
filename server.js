@@ -272,7 +272,7 @@ app.get('/', (req, res) => {
       aspect-ratio: 1 / 2;
       display: block;
     }
-    .panel { grid-column: 4; grid-row: 1 / 3; display: flex; flex-direction: column; gap: 9px; min-width: 0; max-height: 100%; overflow: hidden; }
+    .panel { grid-column: 4; grid-row: 1 / 3; display: flex; flex-direction: column; gap: 9px; min-width: 0; max-height: 100%; overflow-y: auto; padding-right: 4px; }
     h1 { margin: 0; font-size: 22px; line-height: 1.2; letter-spacing: -0.04em; text-align: center; }
     .card { padding: 10px; border-radius: 16px; background: rgba(30,41,59,.82); border: 1px solid rgba(148,163,184,.16); }
     .status { min-height: 42px; color: #fbbf24; font-weight: 800; text-align: center; line-height: 1.4; }
@@ -288,6 +288,7 @@ app.get('/', (req, res) => {
       background: linear-gradient(135deg, #38bdf8, #a78bfa);
     }
     button:disabled { opacity: .45; cursor: not-allowed; }
+    .small-btn { margin-bottom: 10px; padding: 9px 10px; font-size: 13px; }
     .preview-card {
       width: 120px;
       padding: 8px;
@@ -447,6 +448,7 @@ app.get('/', (req, res) => {
       </div>
 
       <div class="card controls">
+        <button id="rotateModeBtn" type="button" class="small-btn">회전방향: 시계방향</button>
         <strong>조작키</strong><br>
         ← / → : 이동<br>
         ↑ : 회전<br>
@@ -485,6 +487,7 @@ const joinForm = document.getElementById('joinForm');
 const nicknameInput = document.getElementById('nicknameInput');
 const statusEl = document.getElementById('status');
 const restartBtn = document.getElementById('restartBtn');
+const rotateModeBtn = document.getElementById('rotateModeBtn');
 const chatBox = document.getElementById('chatBox');
 const chatForm = document.getElementById('chatForm');
 const chatInput = document.getElementById('chatInput');
@@ -494,8 +497,9 @@ let playerNames = {};
 let myNickname = '';
 let paused = false;
 let finished = false;
-let animationId;
+let gameTimer = null;
 let lastTime = 0;
+let rotateDirection = 'cw';
 let ws;
 
 const players = [1,2,3,4,5].map(n => createPlayer(
@@ -628,7 +632,15 @@ function addGarbageLines(player, count) {
   }
   if (collide(player)) lose(player);
 }
-function rotate(matrix) { return matrix[0].map((_,i) => matrix.map(row => row[i]).reverse()); }
+function rotateClockwise(matrix) {
+  return matrix[0].map((_, i) => matrix.map(row => row[i]).reverse());
+}
+function rotateCounterClockwise(matrix) {
+  return matrix[0].map((_, i) => matrix.map(row => row[row.length - 1 - i]));
+}
+function rotate(matrix) {
+  return rotateDirection === 'ccw' ? rotateCounterClockwise(matrix) : rotateClockwise(matrix);
+}
 function rotatePiece(player) {
   if (player.lost || !player.active) return;
   const original = player.piece.shape;
@@ -676,7 +688,7 @@ function checkWinner() {
     activeAlive[0].stateEl.innerHTML = '<span class="winner">승리</span>';
     statusEl.textContent = activeAlive[0].name + ' 승리!';
     drawAll();
-    cancelAnimationFrame(animationId);
+    stopGameLoop();
   }
 }
 function lose(player) {
@@ -735,22 +747,37 @@ function startLocalGame() {
   });
   paused = false; finished = false; lastTime = 0; updateStates();
   statusEl.textContent = myPlayer + 'P로 플레이 중';
-  cancelAnimationFrame(animationId); update(); syncMine(); drawAll();
+  stopGameLoop(); startGameLoop(); syncMine(); drawAll();
 }
 function restartGame() { send({ type:'restart' }); startLocalGame(); }
 function togglePause() {
   if (finished || !myPlayer) return;
   paused = !paused; statusEl.textContent = paused ? '일시정지' : myPlayer + 'P로 플레이 중';
-  if (!paused) { lastTime = performance.now(); update(lastTime); }
+  if (!paused) { lastTime = Date.now(); startGameLoop(); }
 }
-function update(time = 0) {
+function startGameLoop() {
+  stopGameLoop();
+  lastTime = Date.now();
+  gameTimer = setInterval(update, 50);
+}
+function stopGameLoop() {
+  if (gameTimer) {
+    clearInterval(gameTimer);
+    gameTimer = null;
+  }
+}
+function update() {
   if (finished || paused || !myPlayer) return;
   const mine = getMine();
-  const delta = time - lastTime; lastTime = time;
+  const now = Date.now();
+  const delta = Math.min(now - lastTime, 500);
+  lastTime = now;
   mine.dropCounter += delta;
-  if (mine.dropCounter > mine.dropInterval) dropPiece(mine);
+  while (mine.dropCounter > mine.dropInterval) {
+    dropPiece(mine);
+    mine.dropCounter -= mine.dropInterval;
+  }
   drawAll(); syncMine(); checkWinner();
-  animationId = requestAnimationFrame(update);
 }
 function addChatLine(type, text) {
   const div = document.createElement('div');
@@ -819,6 +846,15 @@ document.addEventListener('keydown', (e) => {
   drawAll(); syncMine();
 });
 restartBtn.addEventListener('click', restartGame);
+rotateModeBtn.addEventListener('click', () => {
+  if (rotateDirection === 'cw') {
+    rotateDirection = 'ccw';
+    rotateModeBtn.textContent = '회전방향: 반시계방향';
+  } else {
+    rotateDirection = 'cw';
+    rotateModeBtn.textContent = '회전방향: 시계방향';
+  }
+});
 joinForm.addEventListener('submit', (e) => {
   e.preventDefault();
   if (!myPlayer) return;
@@ -836,6 +872,11 @@ chatForm.addEventListener('submit', (e) => {
   if (!message || !myPlayer) return;
   send({ type:'chat', message });
   chatInput.value = '';
+});
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && !finished && !paused && myPlayer) {
+    lastTime = Date.now();
+  }
 });
 connect();
 drawAll();
