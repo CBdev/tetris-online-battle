@@ -1,5 +1,5 @@
 // server.js
-// 3인 온라인 대전 테트리스 + 실시간 채팅
+// 5인 온라인 대전 테트리스 + 실시간 채팅
 // 실행:
 // npm init -y
 // npm install express ws
@@ -14,7 +14,7 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 const PORT = process.env.PORT || 3000;
-const MAX_PLAYERS = 3;
+const MAX_PLAYERS = 5;
 
 const clients = new Map();
 
@@ -91,7 +91,7 @@ app.get('/', (req, res) => {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>3인 온라인 대전 테트리스</title>
+  <title>5인 온라인 대전 테트리스</title>
   <style>
     * { box-sizing: border-box; }
     body {
@@ -106,9 +106,9 @@ app.get('/', (req, res) => {
       padding: 16px;
     }
     .game-wrap {
-      width: min(1320px, 100%);
+      width: min(1720px, 100%);
       display: grid;
-      grid-template-columns: 1fr 1fr 1fr 280px;
+      grid-template-columns: repeat(5, 1fr) 280px;
       gap: 16px;
       padding: 18px;
       border-radius: 24px;
@@ -223,9 +223,25 @@ app.get('/', (req, res) => {
         <canvas id="next3" width="120" height="90"></canvas>
       </div>
     </section>
+    <section class="player-area">
+      <div class="player-title"><strong>4P</strong><span id="p4State">대기중</span></div>
+      <canvas id="board4" width="300" height="600"></canvas>
+      <div class="preview-card">
+        <div class="preview-label">다음 블록</div>
+        <canvas id="next4" width="120" height="90"></canvas>
+      </div>
+    </section>
+    <section class="player-area">
+      <div class="player-title"><strong>5P</strong><span id="p5State">대기중</span></div>
+      <canvas id="board5" width="300" height="600"></canvas>
+      <div class="preview-card">
+        <div class="preview-label">다음 블록</div>
+        <canvas id="next5" width="120" height="90"></canvas>
+      </div>
+    </section>
 
     <section class="panel">
-      <h1>3인 온라인 대전<br>테트리스</h1>
+      <h1>5인 온라인 대전<br>테트리스</h1>
       <div class="status" id="status">서버 연결 중...</div>
       <button id="restartBtn" disabled>새 게임</button>
 
@@ -234,6 +250,8 @@ app.get('/', (req, res) => {
         <div class="score-row"><strong>1P</strong><span id="p1Score">0</span><span id="p1Lines">0</span><span id="p1Combo">0</span></div>
         <div class="score-row"><strong>2P</strong><span id="p2Score">0</span><span id="p2Lines">0</span><span id="p2Combo">0</span></div>
         <div class="score-row"><strong>3P</strong><span id="p3Score">0</span><span id="p3Lines">0</span><span id="p3Combo">0</span></div>
+        <div class="score-row"><strong>4P</strong><span id="p4Score">0</span><span id="p4Lines">0</span><span id="p4Combo">0</span></div>
+        <div class="score-row"><strong>5P</strong><span id="p5Score">0</span><span id="p5Lines">0</span><span id="p5Combo">0</span></div>
       </div>
 
       <div class="card controls">
@@ -246,7 +264,7 @@ app.get('/', (req, res) => {
       </div>
 
       <div class="card rule">
-        3명 중 마지막 생존자가 승리합니다.<br>
+        5명 중 마지막 생존자가 승리합니다.<br>
         2줄 이상 삭제하면 생존 상대 중 1명에게 방해줄을 보냅니다.<br>
         콤보가 높을수록 추가 공격이 붙습니다.
       </div>
@@ -263,7 +281,7 @@ app.get('/', (req, res) => {
   </main>
 
 <script>
-const COLS = 10, ROWS = 20, BLOCK = 30, MAX_PLAYERS = 3;
+const COLS = 10, ROWS = 20, BLOCK = 30, MAX_PLAYERS = 5;
 const COLORS = { I:'#22d3ee', J:'#60a5fa', L:'#fb923c', O:'#facc15', S:'#4ade80', T:'#c084fc', Z:'#f87171', G:'#64748b' };
 const SHAPES = {
   I:[[1,1,1,1]], J:[[1,0,0],[1,1,1]], L:[[0,0,1],[1,1,1]], O:[[1,1],[1,1]],
@@ -283,7 +301,7 @@ let animationId;
 let lastTime = 0;
 let ws;
 
-const players = [1,2,3].map(n => createPlayer(
+const players = [1,2,3,4,5].map(n => createPlayer(
   n,
   document.getElementById('board' + n),
   document.getElementById('next' + n),
@@ -529,7 +547,7 @@ function connect() {
       statusEl.textContent = myPlayer + 'P로 접속됨. 새 게임을 누르세요.';
       updateStates(); drawAll();
     }
-    if (data.type === 'full') statusEl.textContent = '이미 3명이 접속 중입니다.';
+    if (data.type === 'full') statusEl.textContent = '이미 5명이 접속 중입니다.';
     if (data.type === 'system') addChatLine('system', data.message);
     if (data.type === 'players') {
       connectedPlayers = data.players;
@@ -589,8 +607,8 @@ drawAll();
 
 server.listen(PORT, '0.0.0.0', () => {
   const ip = getLocalIp();
-  console.log('3인 온라인 대전 테트리스 서버 실행 중');
-  console.log('서버 PC 접속: http://localhost:' + PORT);
-  console.log('같은 내부망 접속: http://' + ip + ':' + PORT);
+  console.log('5인 온라인 대전 테트리스 서버 실행 중');
+  console.log(`서버 PC 접속: http://localhost:${PORT}`);
+  console.log(`같은 내부망 접속: http://${ip}:${PORT}`);
   console.log('외부 접속은 Render, Railway, ngrok 등 공개 주소를 사용하세요.');
 });
